@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JIT4Labs - FedEx Shipment Creator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #4b1d8f 0%, #6a3dbf 100%);
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .header svg { width: 32px; height: 32px; }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header .rn-badge {
+            margin-left: auto;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 14px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 24px auto;
+            padding: 0 16px;
+        }
+        .loading-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            text-align: center;
+        }
+        .spinner {
+            width: 48px; height: 48px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #4b1d8f;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-overlay p { margin-top: 16px; color: #666; font-size: 15px; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #4b1d8f;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f0e6ff;
+        }
+        .address-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 640px) {
+            .address-grid { grid-template-columns: 1fr; }
+        }
+        .address-box {
+            background: #faf8ff;
+            border: 1px solid #e8dff5;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .address-box h3 {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .address-box .name { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+        .address-box .detail { font-size: 14px; color: #555; line-height: 1.5; }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .form-row.three-col {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 4px;
+        }
+        .form-group input, .form-group select {
+            padding: 10px 12px;
+            border: 1px solid #d0d5dd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            background: white;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #4b1d8f;
+            box-shadow: 0 0 0 3px rgba(75,29,143,0.1);
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .items-table th {
+            text-align: left;
+            padding: 8px 12px;
+            background: #faf8ff;
+            border-bottom: 2px solid #e8dff5;
+            font-weight: 600;
+            color: #555;
+            font-size: 13px;
+        }
+        .items-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .btn-ship {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #4b1d8f 0%, #6a3dbf 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            margin-top: 8px;
+        }
+        .btn-ship:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(75,29,143,0.3);
+        }
+        .btn-ship:active { transform: translateY(0); }
+        .btn-ship:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-ship svg { width: 20px; height: 20px; }
+        .result-panel {
+            display: none;
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .result-panel.error {
+            background: #fef2f2;
+            border-color: #fca5a5;
+        }
+        .result-panel h2 { color: #166534; border: none; margin-bottom: 8px; }
+        .result-panel.error h2 { color: #991b1b; }
+        .result-panel .tracking { font-size: 24px; font-weight: 700; color: #166534; margin: 8px 0; }
+        .btn-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #166534;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            text-decoration: none;
+        }
+        .btn-download:hover { background: #14532d; }
+        .status-bar {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #eff6ff;
+            border: 1px solid #93c5fd;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: #1e40af;
+        }
+        .status-bar .spinner-sm {
+            width: 18px; height: 18px;
+            border: 2px solid #93c5fd;
+            border-top-color: #1e40af;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .config-banner {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #92400e;
+        }
+        .config-banner code {
+            background: rgba(0,0,0,0.06);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .edit-btn {
+            font-size: 12px;
+            color: #4b1d8f;
+            cursor: pointer;
+            background: none;
+            border: 1px solid #d0d5dd;
+            border-radius: 6px;
+            padding: 4px 10px;
+            margin-left: 8px;
+        }
+        .edit-btn:hover { background: #faf8ff; }
+        .address-edit-row {
+            display: none;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .address-edit-row input {
+            padding: 6px 8px;
+            border: 1px solid #d0d5dd;
+            border-radius: 6px;
+            font-size: 13px;
+            width: 100%;
+        }
+        .address-edit-row.visible {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"/>
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+        <line x1="12" y1="22.08" x2="12" y2="12"/>
+    </svg>
+    <h1>JIT4Labs — FedEx Shipment</h1>
+    <span class="rn-badge" id="rnBadge">Loading...</span>
+</div>
+
+<div class="container">
+    <!-- Loading State -->
+    <div id="loadingState" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Fetching Receipt Note data from Vtiger...</p>
+    </div>
+
+    <!-- Config Warning -->
+    <div id="configBanner" class="config-banner" style="display:none;">
+        ⚠️ Zapier webhook URLs not configured. Open <code>config.js</code> and set your webhook URLs.
+    </div>
+
+    <!-- Status Bar -->
+    <div id="statusBar" class="status-bar">
+        <div class="spinner-sm"></div>
+        <span id="statusText">Processing...</span>
+    </div>
+
+    <!-- Result Panel -->
+    <div id="resultPanel" class="result-panel"></div>
+
+    <!-- Main Form (hidden until data loads) -->
+    <div id="mainForm" style="display:none;">
+        <!-- Addresses -->
+        <div class="card">
+            <h2>📍 Shipping Addresses</h2>
+            <div class="address-grid">
+                <div class="address-box">
+                    <h3>Ship From (Vendor Location)
+                        <button class="edit-btn" onclick="toggleEdit('from')">Edit</button>
+                    </h3>
+                    <div class="name" id="fromName">JIT4Labs</div>
+                    <div class="detail" id="fromAddress">Loading...</div>
+                    <div class="address-edit-row" id="fromEdit">
+                        <input id="fromStreet" placeholder="Street">
+                        <input id="fromCity" placeholder="City">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <input id="fromState" placeholder="State code (e.g. CA)">
+                            <input id="fromZip" placeholder="ZIP">
+                        </div>
+                        <input id="fromCountry" placeholder="Country code (e.g. US)" value="US">
+                        <input id="fromPhone" placeholder="Phone">
+                    </div>
+                </div>
+                <div class="address-box">
+                    <h3>Ship To (PO Shipping Address)
+                        <button class="edit-btn" onclick="toggleEdit('to')">Edit</button>
+                    </h3>
+                    <div class="name" id="toName">Loading...</div>
+                    <div class="detail" id="toAddress">Loading...</div>
+                    <div class="address-edit-row" id="toEdit">
+                        <input id="toCompany" placeholder="Company Name">
+                        <input id="toStreet" placeholder="Street">
+                        <input id="toCity" placeholder="City">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <input id="toState" placeholder="State code (e.g. WI)">
+                            <input id="toZip" placeholder="ZIP">
+                        </div>
+                        <input id="toCountry" placeholder="Country code (e.g. US)" value="US">
+                        <input id="toPhone" placeholder="Phone">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Line Items -->
+        <div class="card">
+            <h2>📦 Receipt Note Items</h2>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Unit Price</th>
+                        <th>Net</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Carrier Account -->
+        <div class="card">
+            <h2>🏷️ Carrier Account</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>FedEx Account Number (from Organization)</label>
+                    <input type="text" id="carrierAccNumber" placeholder="Loading from Vtiger...">
+                </div>
+                <div class="form-group">
+                    <label>Preferred Carrier</label>
+                    <input type="text" id="preferredCarrier" readonly style="background:#f5f5f5;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Package Details -->
+        <div class="card">
+            <h2>📐 Package Details</h2>
+            <div class="form-row three-col">
+                <div class="form-group">
+                    <label>Length (in)</label>
+                    <input type="number" id="pkgLength" value="12" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label>Width (in)</label>
+                    <input type="number" id="pkgWidth" value="10" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label>Height (in)</label>
+                    <input type="number" id="pkgHeight" value="6" min="1" step="1">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Weight (lbs)</label>
+                    <input type="number" id="pkgWeight" value="5" min="0.1" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label>FedEx Service</label>
+                    <select id="serviceType">
+                        <option value="FEDEX_GROUND">FedEx Ground</option>
+                        <option value="FEDEX_EXPRESS_SAVER">FedEx Express Saver</option>
+                        <option value="FEDEX_2_DAY">FedEx 2Day</option>
+                        <option value="FEDEX_2_DAY_AM">FedEx 2Day AM</option>
+                        <option value="STANDARD_OVERNIGHT">Standard Overnight</option>
+                        <option value="PRIORITY_OVERNIGHT">Priority Overnight</option>
+                        <option value="FIRST_OVERNIGHT">First Overnight</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Package Type</label>
+                    <select id="packagingType">
+                        <option value="YOUR_PACKAGING">Your Packaging</option>
+                        <option value="FEDEX_BOX">FedEx Box</option>
+                        <option value="FEDEX_ENVELOPE">FedEx Envelope</option>
+                        <option value="FEDEX_PAK">FedEx Pak</option>
+                        <option value="FEDEX_TUBE">FedEx Tube</option>
+                        <option value="FEDEX_SMALL_BOX">FedEx Small Box</option>
+                        <option value="FEDEX_MEDIUM_BOX">FedEx Medium Box</option>
+                        <option value="FEDEX_LARGE_BOX">FedEx Large Box</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ship Date</label>
+                    <input type="date" id="shipDate">
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="card" style="text-align:center;">
+            <button class="btn-ship" id="btnCreateShipment" onclick="createShipment()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+                Create Shipment & Generate Label
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Config file (edit these values) -->
+<script src="config.js"></script>
+
+<script>
+    // ========================
+    // STATE
+    // ========================
+    let receiptNoteData = null;
+    let vendorData = null;
+    let poData = null;
+    let orgData = null;
+
+    // ========================
+    // INIT
+    // ========================
+    document.addEventListener('DOMContentLoaded', () => {
+        // Set default ship date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('shipDate').value = today;
+
+        // Get RN ID from URL
+        const params = new URLSearchParams(window.location.search);
+        const rnId = params.get('rn_id');
+        const rnRecordId = params.get('record_id'); // Vtiger record ID format
+
+        if (!rnId && !rnRecordId) {
+            showError('No Receipt Note ID provided. Open this page from Vtiger with ?rn_id=XXX');
+            return;
+        }
+
+        // Check config
+        if (!window.APP_CONFIG || !window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK) {
+            document.getElementById('configBanner').style.display = 'block';
+        }
+
+        fetchReceiptNoteData(rnId || rnRecordId);
+    });
+
+    // ========================
+    // DATA FETCHING
+    // ========================
+    async function fetchReceiptNoteData(rnId) {
+        try {
+            const response = await fetch(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'fetch_rn_data', rn_id: rnId })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to fetch data');
+            }
+
+            receiptNoteData = data.receipt_note;
+            vendorData = data.vendor;
+            poData = data.purchase_order;
+            orgData = data.organization || {};
+
+            populateForm();
+
+        } catch (err) {
+            showError('Failed to load Receipt Note data: ' + err.message);
+        }
+    }
+
+    function populateForm() {
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('mainForm').style.display = 'block';
+
+        // Badge
+        document.getElementById('rnBadge').textContent = receiptNoteData.receiptnote_no || 'Receipt Note';
+
+        // Ship From: JIT4Labs + Vendor address
+        document.getElementById('fromName').textContent = 'JIT4Labs';
+        const vendorAddr = [
+            vendorData.street,
+            [vendorData.city, vendorData.state, vendorData.postalcode].filter(Boolean).join(', '),
+            vendorData.country
+        ].filter(Boolean).join('\n');
+        document.getElementById('fromAddress').textContent = vendorAddr;
+        document.getElementById('fromAddress').style.whiteSpace = 'pre-line';
+
+        // Pre-fill edit fields
+        document.getElementById('fromStreet').value = vendorData.street || '';
+        document.getElementById('fromCity').value = vendorData.city || '';
+        document.getElementById('fromState').value = getStateCode(vendorData.state) || '';
+        document.getElementById('fromZip').value = vendorData.postalcode || '';
+        document.getElementById('fromCountry').value = vendorData.country || 'US';
+        document.getElementById('fromPhone').value = vendorData.phone || '';
+
+        // Ship To: PO shipping address
+        const poShipName = poData.subject || 'Purchase Order';
+        document.getElementById('toName').textContent = poShipName;
+        const shipAddr = [
+            poData.ship_street,
+            [poData.ship_city, poData.ship_state, poData.ship_code].filter(Boolean).join(', '),
+            poData.ship_country
+        ].filter(Boolean).join('\n');
+        document.getElementById('toAddress').textContent = shipAddr;
+        document.getElementById('toAddress').style.whiteSpace = 'pre-line';
+
+        // Pre-fill edit fields
+        document.getElementById('toCompany').value = poData.bill_street ? 'JIT4You, Inc.' : '';
+        document.getElementById('toStreet').value = poData.ship_street || '';
+        document.getElementById('toCity').value = poData.ship_city || '';
+        document.getElementById('toState').value = getStateCode(poData.ship_state) || '';
+        document.getElementById('toZip').value = poData.ship_code || '';
+        document.getElementById('toCountry').value = poData.ship_country || 'US';
+        document.getElementById('toPhone').value = '';
+
+        // Carrier account from Organization
+        document.getElementById('carrierAccNumber').value = orgData.cf_accounts_carrieraccnumber || '';
+        document.getElementById('preferredCarrier').value = orgData.cf_accounts_preferredcarrier || '';
+
+        // Line items
+        const tbody = document.getElementById('itemsBody');
+        tbody.innerHTML = '';
+        const items = receiptNoteData.lineItems || [];
+        items.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.productName || item.productid || '—'}</td>
+                <td>${parseFloat(item.quantity || 0).toFixed(0)}</td>
+                <td>$${parseFloat(item.listprice || 0).toFixed(2)}</td>
+                <td>$${parseFloat(item.netprice || 0).toFixed(2)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // ========================
+    // CREATE SHIPMENT
+    // ========================
+    async function createShipment() {
+        const btn = document.getElementById('btnCreateShipment');
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner-sm"></div> Creating Shipment...';
+        showStatus('Connecting to FedEx and creating shipment...');
+
+        // Gather form data
+        const shipmentData = {
+            action: 'create_shipment',
+            rn_id: receiptNoteData.id,
+            rn_no: receiptNoteData.receiptnote_no,
+            shipper: {
+                company: 'JIT4Labs',
+                street: document.getElementById('fromStreet').value,
+                city: document.getElementById('fromCity').value,
+                state: document.getElementById('fromState').value,
+                zip: document.getElementById('fromZip').value,
+                country: document.getElementById('fromCountry').value,
+                phone: document.getElementById('fromPhone').value || '0000000000'
+            },
+            recipient: {
+                company: document.getElementById('toCompany').value || 'JIT4You, Inc.',
+                street: document.getElementById('toStreet').value,
+                city: document.getElementById('toCity').value,
+                state: document.getElementById('toState').value,
+                zip: document.getElementById('toZip').value,
+                country: document.getElementById('toCountry').value,
+                phone: document.getElementById('toPhone').value || '0000000000'
+            },
+            package: {
+                weight: parseFloat(document.getElementById('pkgWeight').value),
+                length: parseInt(document.getElementById('pkgLength').value),
+                width: parseInt(document.getElementById('pkgWidth').value),
+                height: parseInt(document.getElementById('pkgHeight').value),
+                serviceType: document.getElementById('serviceType').value,
+                packagingType: document.getElementById('packagingType').value
+            },
+            shipDate: document.getElementById('shipDate').value,
+            carrierAccountNumber: document.getElementById('carrierAccNumber').value
+        };
+
+        try {
+            const response = await fetch(window.APP_CONFIG.ZAPIER_FEDEX_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(shipmentData)
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || 'Shipment creation failed');
+            }
+
+            hideStatus();
+            showSuccess(result);
+
+            // Update tracking number in Vtiger if PO has tracking field
+            if (result.trackingNumber && poData.id) {
+                updateVtigerTracking(result.trackingNumber);
+            }
+
+        } catch (err) {
+            hideStatus();
+            showError('Shipment creation failed: ' + err.message);
+            btn.disabled = false;
+            btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg> Retry — Create Shipment`;
+        }
+    }
+
+    async function updateVtigerTracking(trackingNumber) {
+        try {
+            await fetch(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'update_tracking',
+                    po_id: poData.id,
+                    tracking_number: trackingNumber
+                })
+            });
+        } catch (e) {
+            console.warn('Could not update tracking in Vtiger:', e);
+        }
+    }
+
+    // ========================
+    // UI HELPERS
+    // ========================
+    function toggleEdit(which) {
+        const el = document.getElementById(which + 'Edit');
+        el.classList.toggle('visible');
+    }
+
+    function showStatus(msg) {
+        const bar = document.getElementById('statusBar');
+        document.getElementById('statusText').textContent = msg;
+        bar.style.display = 'flex';
+    }
+
+    function hideStatus() {
+        document.getElementById('statusBar').style.display = 'none';
+    }
+
+    function showError(msg) {
+        document.getElementById('loadingState').style.display = 'none';
+        const panel = document.getElementById('resultPanel');
+        panel.className = 'result-panel error';
+        panel.style.display = 'block';
+        panel.innerHTML = `<h2>❌ Error</h2><p>${msg}</p>`;
+    }
+
+    function showSuccess(result) {
+        const panel = document.getElementById('resultPanel');
+        panel.className = 'result-panel';
+        panel.style.display = 'block';
+        panel.innerHTML = `
+            <h2>✅ Shipment Created Successfully</h2>
+            <div class="tracking">${result.trackingNumber}</div>
+            <p style="color:#555; margin-bottom: 8px;">FedEx ${document.getElementById('serviceType').value.replace(/_/g, ' ')}</p>
+            <a class="btn-download" href="data:application/pdf;base64,${result.labelBase64}" download="FedEx_Label_${result.trackingNumber}.pdf">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+                Download Shipping Label (PDF)
+            </a>
+        `;
+    }
+
+    function getStateCode(stateName) {
+        if (!stateName) return '';
+        if (stateName.length <= 2) return stateName.toUpperCase();
+        const states = {
+            'alabama':'AL','alaska':'AK','arizona':'AZ','arkansas':'AR','california':'CA',
+            'colorado':'CO','connecticut':'CT','delaware':'DE','florida':'FL','georgia':'GA',
+            'hawaii':'HI','idaho':'ID','illinois':'IL','indiana':'IN','iowa':'IA','kansas':'KS',
+            'kentucky':'KY','louisiana':'LA','maine':'ME','maryland':'MD','massachusetts':'MA',
+            'michigan':'MI','minnesota':'MN','mississippi':'MS','missouri':'MO','montana':'MT',
+            'nebraska':'NE','nevada':'NV','new hampshire':'NH','new jersey':'NJ','new mexico':'NM',
+            'new york':'NY','north carolina':'NC','north dakota':'ND','ohio':'OH','oklahoma':'OK',
+            'oregon':'OR','pennsylvania':'PA','rhode island':'RI','south carolina':'SC',
+            'south dakota':'SD','tennessee':'TN','texas':'TX','utah':'UT','vermont':'VT',
+            'virginia':'VA','washington':'WA','west virginia':'WV','wisconsin':'WI','wyoming':'WY'
+        };
+        return states[stateName.toLowerCase()] || stateName;
+    }
+</script>
+
+</body>
+</html>
