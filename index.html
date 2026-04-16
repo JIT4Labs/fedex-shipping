@@ -512,17 +512,13 @@
             var requestId = generateRequestId();
             document.getElementById('loadingText').textContent = 'Requesting data from Vtiger...';
 
-            // Send request to Zapier (no-cors to avoid CORS preflight block)
-            await fetch(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({
-                    action: 'fetch_rn_data',
-                    rn_id: rnId,
-                    request_id: requestId
-                })
+            // Send request to Zapier via sendBeacon (bypasses CORS entirely)
+            var payload = JSON.stringify({
+                action: 'fetch_rn_data',
+                rn_id: rnId,
+                request_id: requestId
             });
+            navigator.sendBeacon(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, new Blob([payload], { type: 'text/plain' }));
 
             document.getElementById('loadingText').textContent = 'Waiting for Vtiger data (this takes ~15 seconds)...';
 
@@ -653,13 +649,8 @@
         };
 
         try {
-            // Send to Zapier (no-cors to avoid CORS preflight block)
-            await fetch(window.APP_CONFIG.ZAPIER_FEDEX_WEBHOOK, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(shipmentData)
-            });
+            // Send to Zapier via sendBeacon (bypasses CORS entirely)
+            navigator.sendBeacon(window.APP_CONFIG.ZAPIER_FEDEX_WEBHOOK, new Blob([JSON.stringify(shipmentData)], { type: 'text/plain' }));
 
             showStatus('Waiting for FedEx response (this takes ~20 seconds)...');
 
@@ -688,17 +679,12 @@
 
     async function updateVtigerTracking(trackingNumber) {
         try {
-            await fetch(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({
-                    action: 'update_tracking',
-                    request_id: generateRequestId(),
-                    po_id: poData.id,
-                    tracking_number: trackingNumber
-                })
-            });
+            navigator.sendBeacon(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, new Blob([JSON.stringify({
+                action: 'update_tracking',
+                request_id: generateRequestId(),
+                po_id: poData.id,
+                tracking_number: trackingNumber
+            })], { type: 'text/plain' }));
         } catch (e) {
             console.warn('Could not update tracking in Vtiger:', e);
         }
