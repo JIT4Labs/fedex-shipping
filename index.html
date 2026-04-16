@@ -455,6 +455,33 @@
         return 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     }
 
+    // Fire-and-forget POST to Zapier using hidden form + iframe (bypasses CORS completely)
+    function fireToZapier(url, data) {
+        var iframe = document.createElement('iframe');
+        iframe.name = 'zap_' + Date.now();
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = url;
+        form.target = iframe.name;
+
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'payload';
+        input.value = JSON.stringify(data);
+        form.appendChild(input);
+
+        document.body.appendChild(form);
+        form.submit();
+
+        setTimeout(function() {
+            try { document.body.removeChild(form); } catch(e) {}
+            try { document.body.removeChild(iframe); } catch(e) {}
+        }, 10000);
+    }
+
     // Poll GitHub API for a result file
     async function pollGitHub(filename, maxAttempts, intervalMs) {
         maxAttempts = maxAttempts || 30;
@@ -512,13 +539,12 @@
             var requestId = generateRequestId();
             document.getElementById('loadingText').textContent = 'Requesting data from Vtiger...';
 
-            // Send request to Zapier via sendBeacon (bypasses CORS entirely)
-            var payload = JSON.stringify({
+            // Send request to Zapier via hidden form (bypasses CORS entirely)
+            fireToZapier(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, {
                 action: 'fetch_rn_data',
                 rn_id: rnId,
                 request_id: requestId
             });
-            navigator.sendBeacon(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, new Blob([payload], { type: 'text/plain' }));
 
             document.getElementById('loadingText').textContent = 'Waiting for Vtiger data (this takes ~15 seconds)...';
 
@@ -649,8 +675,8 @@
         };
 
         try {
-            // Send to Zapier via sendBeacon (bypasses CORS entirely)
-            navigator.sendBeacon(window.APP_CONFIG.ZAPIER_FEDEX_WEBHOOK, new Blob([JSON.stringify(shipmentData)], { type: 'text/plain' }));
+            // Send to Zapier via hidden form (bypasses CORS entirely)
+            fireToZapier(window.APP_CONFIG.ZAPIER_FEDEX_WEBHOOK, shipmentData);
 
             showStatus('Waiting for FedEx response (this takes ~20 seconds)...');
 
@@ -679,12 +705,12 @@
 
     async function updateVtigerTracking(trackingNumber) {
         try {
-            navigator.sendBeacon(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, new Blob([JSON.stringify({
+            fireToZapier(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, {
                 action: 'update_tracking',
                 request_id: generateRequestId(),
                 po_id: poData.id,
                 tracking_number: trackingNumber
-            })], { type: 'text/plain' }));
+            });
         } catch (e) {
             console.warn('Could not update tracking in Vtiger:', e);
         }
