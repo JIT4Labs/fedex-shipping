@@ -512,10 +512,11 @@
             var requestId = generateRequestId();
             document.getElementById('loadingText').textContent = 'Requesting data from Vtiger...';
 
-            // Send request to Zapier
+            // Send request to Zapier (no-cors to avoid CORS preflight block)
             await fetch(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({
                     action: 'fetch_rn_data',
                     rn_id: rnId,
@@ -652,10 +653,11 @@
         };
 
         try {
-            // Send to Zapier
+            // Send to Zapier (no-cors to avoid CORS preflight block)
             await fetch(window.APP_CONFIG.ZAPIER_FEDEX_WEBHOOK, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify(shipmentData)
             });
 
@@ -688,7 +690,8 @@
         try {
             await fetch(window.APP_CONFIG.ZAPIER_VTIGER_WEBHOOK, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify({
                     action: 'update_tracking',
                     request_id: generateRequestId(),
